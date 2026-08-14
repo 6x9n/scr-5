@@ -1,4 +1,4 @@
-﻿import json
+import json
 import os
 import subprocess
 import sys
@@ -62,7 +62,7 @@ def save_state(state, commit):
     if not commit:
         return
     if not in_git_repo():
-        print("(Ù„Ø§ ÙŠÙˆØ¬Ø¯ Ù…Ø³ØªÙˆØ¯Ø¹ git Ù‡Ù†Ø§ â€” ØªÙ… Ø­ÙØ¸ Ø§Ù„Ù…Ù„ÙØ§Øª ÙÙ‚Ø· Ø¯ÙˆÙ† commit)")
+        print("(لا يوجد مستودع git هنا — تم حفظ الملفات فقط دون commit)")
         return
 
     git("add", "-A")
@@ -73,13 +73,13 @@ def save_state(state, commit):
         for attempt in range(5):
             pull = git("pull", "--rebase", "origin", branch, check=False)
             if pull.returncode != 0:
-                print(f"âš ï¸ git pull ÙØ´Ù„: {pull.stderr.strip()[:200]} â€” Ù…Ø­Ø§ÙˆÙ„Ø© Ø£Ø®Ø±Ù‰...")
+                print(f"⚠️ git pull فشل: {pull.stderr.strip()[:200]} — محاولة أخرى...")
                 time.sleep(10)
                 continue
             push = git("push", "origin", branch, check=False)
             if push.returncode == 0:
                 break
-            print(f"âš ï¸ git push ÙØ´Ù„: {push.stderr.strip()[:200]} â€” Ù…Ø­Ø§ÙˆÙ„Ø© Ø£Ø®Ø±Ù‰...")
+            print(f"⚠️ git push فشل: {push.stderr.strip()[:200]} — محاولة أخرى...")
             time.sleep(10)
 
 
@@ -104,7 +104,7 @@ class Scraper:
         self.state = state
         self.known = {r["seat_no"] for r in state["results"]}
         self.next = int(state.get("next_seat", START_SEAT))
-        print(f"[startup] next_seat={self.next} | Ù†ØªØ§Ø¦Ø¬ Ù…Ø­Ù…Ù„Ø©: {len(self.known)}")
+        print(f"[startup] next_seat={self.next} | نتائج محملة: {len(self.known)}")
         self.ban_until = 0.0
         self.start = time.monotonic()
         self.finished = False
@@ -163,7 +163,7 @@ class Scraper:
                     response = session.get(BASE_URL, params={"seat_no": seat_no}, timeout=10)
 
                     if response.status_code == 429:
-                        print(f"âš ï¸ ØªÙ… Ø§Ù„ÙˆØµÙˆÙ„ Ù„Ù„Ø­Ø¯ Ø§Ù„Ø£Ù‚ØµÙ‰ Ø¹Ù†Ø¯ Ø§Ù„Ø±Ù‚Ù… {seat_no}. ØªØ¨Ø§Ø·Ø¤ Ù…Ø¤Ù‚Øª...")
+                        print(f"⚠️ تم الوصول للحد الأقصى عند الرقم {seat_no}. تباطؤ مؤقت...")
                         self.mark_banned()
                         time.sleep(10)
                         continue
@@ -175,7 +175,7 @@ class Scraper:
                             pct_str = data.get("percentage", "0%")
                             student_info = {
                                 "seat_no": seat_no,
-                                "name": data.get("name", "ØºÙŠØ± Ù…Ø¹Ø±ÙˆÙ"),
+                                "name": data.get("name", "غير معروف"),
                                 "school": data.get("school", "-"),
                                 "division": data.get("division", "-"),
                                 "specialization": data.get("specialization", "-"),
@@ -186,19 +186,19 @@ class Scraper:
                             }
                             with self.lock:
                                 self.state["results"].append(student_info)
-                            print(f"âœ“ ØªÙ… Ø³Ø­Ø¨ {seat_no}: {student_info['name']} | {student_info['score']} ({pct_str}) | {student_info['division']} - {student_info['specialization']} | {student_info['school']}")
+                            print(f"✓ تم سحب {seat_no}: {student_info['name']} | {student_info['score']} ({pct_str}) | {student_info['division']} - {student_info['specialization']} | {student_info['school']}")
                         else:
-                            print(f"âœ— Ù„Ø§ ØªÙˆØ¬Ø¯ Ø¨ÙŠØ§Ù†Ø§Øª Ù„Ø±Ù‚Ù… Ø§Ù„Ø¬Ù„ÙˆØ³ {seat_no}")
+                            print(f"✗ لا توجد بيانات لرقم الجلوس {seat_no}")
                         break
                     elif response.status_code == 404:
-                        print(f"âœ— Ø±Ù‚Ù… Ø§Ù„Ø¬Ù„ÙˆØ³ {seat_no} ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯ (404)")
+                        print(f"✗ رقم الجلوس {seat_no} غير موجود (404)")
                         break
                     else:
-                        print(f"âœ— Ø®Ø·Ø£ Ø±Ù…Ø² ({response.status_code}) Ù„Ø±Ù‚Ù… Ø§Ù„Ø¬Ù„ÙˆØ³ {seat_no}")
+                        print(f"✗ خطأ رمز ({response.status_code}) لرقم الجلوس {seat_no}")
                         break
 
                 except Exception as e:
-                    print(f"âš ï¸ Ø®Ø·Ø£ ÙÙŠ Ø§Ù„Ø§ØªØµØ§Ù„ Ø¹Ù†Ø¯ Ø§Ù„Ø±Ù‚Ù… {seat_no}: {e}. Ø¥Ø¹Ø§Ø¯Ø© Ø§Ù„Ù…Ø­Ø§ÙˆÙ„Ø© Ø¨Ø¹Ø¯ 3 Ø«ÙˆØ§Ù†Ù...")
+                    print(f"⚠️ خطأ في الاتصال عند الرقم {seat_no}: {e}. إعادة المحاولة بعد 3 ثوانٍ...")
                     time.sleep(3)
 
             time.sleep(REQUEST_DELAY)
@@ -211,14 +211,14 @@ class Scraper:
             with self.lock:
                 last = self.next - 1
             self.persist(commit=True, last_done=last)
-            print(f"ðŸ’¾ Ø­ÙØ¸ Ø§Ù„ØªÙ‚Ø¯Ù…: Ø¢Ø®Ø± Ø±Ù‚Ù… {last} â€” Ø§Ù„Ù†ØªØ§Ø¦Ø¬: {len(self.snapshot()['results'])}")
+            print(f"💾 حفظ التقدم: آخر رقم {last} — النتائج: {len(self.snapshot()['results'])}")
 
     def run(self):
         if self.next > END_SEAT:
-            print(f"Ø§Ù„Ù…Ø³Ø­ Ù…ÙƒØªÙ…Ù„ Ø¨Ø§Ù„ÙØ¹Ù„ (next_seat={self.next}). Ù„Ø§ Ø´ÙŠØ¡ Ù„ÙØ¹Ù„Ù‡.")
+            print(f"المسح مكتمل بالفعل (next_seat={self.next}). لا شيء لفعله.")
             return
 
-        print(f"Ø¨Ø¯Ø¡ Ø§Ù„Ù…Ø³Ø­ Ø§Ù„Ù…ØªÙˆØ§Ø²ÙŠ ({WORKERS} Ø¹Ù…Ø§Ù„) Ù…Ù† Ø§Ù„Ø±Ù‚Ù… {self.next} Ø­ØªÙ‰ {END_SEAT}...")
+        print(f"بدء المسح المتوازي ({WORKERS} عمال) من الرقم {self.next} حتى {END_SEAT}...")
         session = requests.Session()
         threads = []
         for _ in range(WORKERS):
@@ -239,10 +239,10 @@ class Scraper:
         with self.lock:
             total = len(self.state["results"])
         if self.next > END_SEAT:
-            print("\nâœ… Ø§ÙƒØªÙ…Ù„ Ø§Ù„Ù…Ø³Ø­ Ø¨Ø§Ù„ÙƒØ§Ù…Ù„!")
+            print("\n✅ اكتمل المسح بالكامل!")
         else:
-            print(f"\nâ° Ø§Ù†ØªÙ‡Ù‰ Ø§Ù„ÙˆÙ‚Øª Ø§Ù„Ù…Ø³Ù…ÙˆØ­ ({MAX_RUNTIME_MIN} Ø¯Ù‚ÙŠÙ‚Ø©). Ø§Ù„Ø¬ÙˆØ¨ Ø§Ù„Ù‚Ø§Ø¯Ù… Ø³ÙŠÙƒÙ…Ù„ ØªÙ„Ù‚Ø§Ø¦ÙŠÙ‹Ø§.")
-        print(f"Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„Ø·Ù„Ø§Ø¨: {total}")
+            print(f"\n⏰ انتهى الوقت المسموح ({MAX_RUNTIME_MIN} دقيقة). الجوب القادم سيكمل تلقائيًا.")
+        print(f"إجمالي الطلاب: {total}")
 
 
 if __name__ == "__main__":
